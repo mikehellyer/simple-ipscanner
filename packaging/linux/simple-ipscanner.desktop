@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Simple-IPScanner
+Comment=Find the devices on your network, ping them, and beep when one goes offline or comes online
+Exec=/opt/simple-ipscanner/Simple-IPScanner
+Icon=simple-ipscanner
+Terminal=false
+Categories=Network;Utility;
+Keywords=ip;scanner;network;ping;lan;devices;angry ip;

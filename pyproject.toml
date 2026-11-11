@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simple-ipscanner"
+dynamic = ["version"]
+description = "Find the devices on your network, ping them, and beep when one goes offline or comes online"
+authors = [{ name = "Mike Hellyer" }]
+requires-python = ">=3.12"
+dependencies = [
+    "PySide6",
+    "platformdirs",
+    "certifi",
+    "psutil",
+]
+
+[project.scripts]
+simple-ipscanner = "simple_ipscanner.app:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "simple_ipscanner.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"simple_ipscanner.gui" = ["resources/*.png"]
+"simple_ipscanner.core" = ["data/*.gz"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "tests"]
