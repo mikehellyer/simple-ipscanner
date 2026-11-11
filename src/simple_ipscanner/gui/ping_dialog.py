@@ -53,6 +53,7 @@ class PingDialog(QDialog):
         bottom = QHBoxLayout()
         self._stats_label = QLabel()
         self._stats_label.setProperty("role", "muted")
+        self._stats_label.setTextFormat(Qt.PlainText)
         bottom.addWidget(self._stats_label, stretch=1)
         watch = QPushButton("Watch this device…")
         watch.clicked.connect(lambda: self.watch_requested.emit(self._address.text().strip()))
@@ -79,7 +80,7 @@ class PingDialog(QDialog):
 
     def _start(self) -> None:
         target = self._address.text().strip()
-        if not target or " " in target:
+        if not ping.is_valid_target(target):
             self._address.setFocus()
             return
         self.setWindowTitle(f"Ping {target}")

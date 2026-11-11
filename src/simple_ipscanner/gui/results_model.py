@@ -167,7 +167,7 @@ class ResultsModel(QAbstractTableModel):
                     return f"Didn't answer ping; answered on TCP port {row.result.method[4:]}"
                 if column == PING and row.result and row.result.method == "arp":
                     return "Ignores ping, but answered the network's address lookup (ARP)"
-                return text or None
+                return None  # only the fixed notes above: a tooltip would render a hostname as HTML
             return text
         if role == Qt.DecorationRole and column == IP:
             if row.change == GONE:

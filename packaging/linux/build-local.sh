@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds an installable .deb on this machine, with a new version number
 # every time: bumps the last part of the version (0.1.0 -> 0.1.1), runs
-# the tests, freezes the app with PyInstaller, self-tests the result,
+# the tests and the security check, freezes the app with PyInstaller, self-tests the result,
 # packages it, and commits the new version number.
 #
 # Usage: bash packaging/linux/build-local.sh
@@ -16,6 +16,9 @@ NEW="$("$PY" -c "v='$OLD'.split('.'); v[-1]=str(int(v[-1])+1); print('.'.join(v)
 
 echo "== testing"
 "$ROOT/venv/bin/pytest" -q
+
+echo "== security check"
+bash packaging/security-check.sh "$PY"
 
 echo "== version $OLD -> $NEW"
 sed -i "s/__version__ = \"$OLD\"/__version__ = \"$NEW\"/" src/simple_ipscanner/__init__.py

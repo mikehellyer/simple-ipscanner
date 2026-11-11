@@ -107,7 +107,7 @@ class WatchList:
         if not isinstance(data, list):
             return
         for item in data:
-            if isinstance(item, dict) and isinstance(item.get("ip"), str):
+            if isinstance(item, dict) and isinstance(item.get("ip"), str) and ping.is_valid_target(item["ip"]):
                 mode = item.get("mode") if item.get("mode") in MODE_TEXT else OFFLINE
                 self.add(item["ip"], mode, str(item.get("name", "")))
 

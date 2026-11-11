@@ -4,7 +4,11 @@ devices that ignore pings, a knock on a few common TCP ports — even a
 refused connection proves something answered."""
 from __future__ import annotations
 
+import ipaddress
+import ntpath
+import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -30,13 +34,43 @@ class PingReply:
     text: str = ""  # one line for the ping window
 
 
-def ping_command(ip: str, timeout_ms: int, platform: str = sys.platform) -> list[str]:
+_HOSTNAME = re.compile(
+    r"^(?=.{1,253}\.?$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+    r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.?$"
+)
+
+
+def is_valid_target(text: str) -> bool:
+    """An IPv4 address or a plain hostname — nothing that `ping` could
+    mistake for an option (like "-f"), whether typed in or read back from
+    a settings file."""
+    try:
+        ipaddress.IPv4Address(text)
+        return True
+    except ValueError:
+        return bool(_HOSTNAME.match(text or ""))
+
+
+def system_tool(name: str, platform: str = sys.platform) -> str:
+    """The full path of a system program. On Windows a bare "ping" is
+    looked for in the current folder first, so a ping.exe left there
+    would run instead; System32 is where the real one lives."""
     if platform == "win32":
-        return ["ping", "-n", "1", "-w", str(max(1, timeout_ms)), ip]
+        root = os.environ.get("SystemRoot", r"C:\Windows")
+        return ntpath.join(root, "System32", f"{name.upper()}.EXE")
+    return shutil.which(name) or name
+
+
+def ping_command(ip: str, timeout_ms: int, platform: str = sys.platform) -> list[str]:
+    if not is_valid_target(ip):
+        raise ValueError(f"not an address or hostname: {ip!r}")
+    ping = system_tool("ping", platform)
+    if platform == "win32":
+        return [ping, "-n", "1", "-w", str(max(1, timeout_ms)), ip]
     if platform == "darwin":
-        return ["ping", "-n", "-c", "1", "-W", str(max(1, timeout_ms)), ip]
+        return [ping, "-n", "-c", "1", "-W", str(max(1, timeout_ms)), ip]
     # Linux iputils: -W is in seconds (fractions allowed on any recent one).
-    return ["ping", "-n", "-c", "1", "-W", f"{max(0.2, timeout_ms / 1000):g}", ip]
+    return [ping, "-n", "-c", "1", "-W", f"{max(0.2, timeout_ms / 1000):g}", ip]
 
 
 def parse_ping_output(output: str, returncode: int) -> PingReply:
@@ -63,8 +97,12 @@ def icmp_ping(ip: str, timeout_ms: int = 1000) -> PingReply:
     if sys.platform == "win32":
         kwargs["creationflags"] = 0x08000000  # CREATE_NO_WINDOW: no console flashing up
     try:
+        command = ping_command(ip, timeout_ms)
+    except ValueError:
+        return PingReply(False, text="not a valid address")
+    try:
         result = subprocess.run(
-            ping_command(ip, timeout_ms), capture_output=True, text=True, errors="replace",
+            command, capture_output=True, text=True, errors="replace",
             timeout=timeout_ms / 1000 + 3, **kwargs,
         )
     except (OSError, subprocess.TimeoutExpired):

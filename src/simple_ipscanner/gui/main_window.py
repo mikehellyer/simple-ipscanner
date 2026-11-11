@@ -35,6 +35,13 @@ ICON_PATH = Path(__file__).parent / "resources" / "icon.png"
 UPDATE_OWNER = "mikehellyer"
 UPDATE_REPO = "simple-ipscanner"
 BACKGROUND_JOIN_TIMEOUT_MS = 3000
+def csv_safe(text: str) -> str:
+    """Hostnames come from the network, so any device can pick one. A
+    cell starting with = + - @ would run as a formula when the CSV is
+    opened in a spreadsheet; a leading ' keeps it as plain text."""
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+
+
 SHOW_CHOICES = [("alive", "Devices that are on"), ("all", "Every address"), ("changes", "Only changes since last scan")]
 
 
@@ -128,6 +135,7 @@ class MainWindow(QMainWindow):
         self._empty.setProperty("role", "muted")
         self._empty.setAlignment(Qt.AlignCenter)
         self._empty.setWordWrap(True)
+        self._empty.setTextFormat(Qt.PlainText)
 
         results_page = QWidget()
         results_layout = QVBoxLayout(results_page)
@@ -157,11 +165,13 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         self._status = QLabel()
+        self._status.setTextFormat(Qt.PlainText)
         self.statusBar().addWidget(self._status, 1)
         # Passing notes go on the right, rather than through showMessage(),
         # which would cover the scan's progress text.
         self._note = QLabel()
         self._note.setProperty("role", "muted")
+        self._note.setTextFormat(Qt.PlainText)
         self.statusBar().addPermanentWidget(self._note)
         self._note_timer = QTimer(self)
         self._note_timer.setSingleShot(True)
@@ -442,7 +452,7 @@ class MainWindow(QMainWindow):
                 writer = csv.writer(f)
                 writer.writerow(COLUMNS)
                 for r in range(self._proxy.rowCount()):
-                    writer.writerow([self._proxy.index(r, c).data() or "" for c in range(len(COLUMNS))])
+                    writer.writerow([csv_safe(self._proxy.index(r, c).data() or "") for c in range(len(COLUMNS))])
         except OSError as error:
             QMessageBox.warning(self, "Export", f"Couldn't save the file: {error}")
             return

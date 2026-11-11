@@ -1,7 +1,7 @@
 """The persistent "an update is available" banner shown above the tabs."""
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
 
 RED = "#c0392b"
@@ -25,6 +25,7 @@ class UpdateBanner(QWidget):
         # length, unlike the short fixed messages this label used to
         # only ever show.
         self._label.setWordWrap(True)
+        self._label.setTextFormat(Qt.PlainText)  # installer and GitHub text, never HTML
         layout.addWidget(self._label, stretch=1)
 
         self._update_button = QPushButton("Update")

@@ -30,8 +30,13 @@ class ScanHistory:
             data = json.loads(self._path.read_text())
         except (OSError, ValueError):
             return
-        if isinstance(data, dict):
-            self.entries = {ip: e for ip, e in data.items() if isinstance(e, dict)}
+        if not isinstance(data, dict):
+            return
+        kinds = {"alive": bool, "scanned": (int, float), "seen": (int, float), "hostname": str, "mac": str,
+                 "vendor": str}
+        for ip, entry in data.items():
+            if isinstance(entry, dict):
+                self.entries[ip] = {k: v for k, v in entry.items() if k in kinds and isinstance(v, kinds[k])}
 
     def save(self) -> None:
         if self._path is None:

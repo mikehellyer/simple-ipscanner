@@ -78,6 +78,7 @@ class AlarmBanner(QWidget):
         self._label = QLabel()
         self._label.setStyleSheet("color: #b02a20; font-weight: 600;")
         self._label.setWordWrap(True)
+        self._label.setTextFormat(Qt.PlainText)
         layout.addWidget(self._label, stretch=1)
         self._silence = QPushButton("Silence")
         self._silence.setObjectName("stop")

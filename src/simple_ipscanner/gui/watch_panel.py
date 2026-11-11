@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog,
                                QHBoxLayout, QHeaderView, QLabel, QLineEdit, QPushButton, QTableWidget,
                                QTableWidgetItem, QVBoxLayout, QWidget)
 
+from simple_ipscanner.core.ping import is_valid_target
 from simple_ipscanner.core.watch import BOTH, DOWN, MODE_TEXT, OFFLINE, ONLINE, STATE_TEXT, UP, WatchList
 from simple_ipscanner.gui import style
 
@@ -43,7 +44,7 @@ class AddWatchDialog(QDialog):
 
     def _accept(self) -> None:
         text = self.address.text().strip()
-        if not text or " " in text:
+        if not is_valid_target(text):
             self.address.setFocus()
             return
         self.accept()

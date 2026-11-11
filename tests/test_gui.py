@@ -85,3 +85,20 @@ def test_main_window_scans_and_watches(tmp_path, monkeypatch):
         assert DeviceBook(tmp_path / "devices.json").watches[0]["ip"] == "10.0.0.2"
     finally:
         window.close()
+
+
+def test_csv_export_defuses_formulas():
+    from simple_ipscanner.gui.main_window import csv_safe
+
+    assert csv_safe('=HYPERLINK("http://evil","x")').startswith("'=")
+    assert csv_safe("@SUM(1)") == "'@SUM(1)"
+    assert csv_safe("printer.lan") == "printer.lan"
+    assert csv_safe("12 ms") == "12 ms"
+
+
+def test_hostnames_never_become_tooltips(tmp_path):
+    history = ScanHistory(tmp_path / "h.json")
+    model, _ = _model(history)
+    model.set_result(HostResult("10.0.0.1", True, 1.0, method="ping", hostname="<img src=x>"), None, "")
+    assert model.data(model.index(0, 2)) == "<img src=x>"  # shown, as plain text in the table
+    assert model.data(model.index(0, 2), role=3) is None  # Qt.ToolTipRole

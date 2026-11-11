@@ -8,6 +8,8 @@ import sys
 import uuid
 from pathlib import Path
 
+from simple_ipscanner.core.ping import system_tool
+
 _MAC = re.compile(r"([0-9a-f]{1,2}[:-]){5}[0-9a-f]{1,2}", re.IGNORECASE)
 _IP = re.compile(r"\b(\d{1,3}(?:\.\d{1,3}){3})\b")
 _EMPTY = {"00:00:00:00:00:00", "FF:FF:FF:FF:FF:FF"}
@@ -65,7 +67,7 @@ def read_neighbours() -> dict[str, tuple[str, bool]]:
     kwargs = {"creationflags": 0x08000000} if sys.platform == "win32" else {}
     if sys.platform.startswith("linux"):
         try:
-            result = subprocess.run(["ip", "-4", "neigh", "show"], capture_output=True, text=True, timeout=10)
+            result = subprocess.run([system_tool("ip"), "-4", "neigh", "show"], capture_output=True, text=True, timeout=10)
             if result.returncode == 0:
                 return parse_ip_neigh(result.stdout)
         except (OSError, subprocess.TimeoutExpired):
@@ -75,7 +77,7 @@ def read_neighbours() -> dict[str, tuple[str, bool]]:
         except OSError:
             return {}
     try:
-        result = subprocess.run(["arp", "-a"], capture_output=True, text=True, errors="replace", timeout=10, **kwargs)
+        result = subprocess.run([system_tool("arp"), "-a"], capture_output=True, text=True, errors="replace", timeout=10, **kwargs)
     except (OSError, subprocess.TimeoutExpired):
         return {}
     return {ip: (mac, False) for ip, mac in parse_arp_a(result.stdout).items()}

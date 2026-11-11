@@ -34,6 +34,10 @@ for size in 16 32 48 64 128 256 512; do
   cp "$ROOT/packaging/icons/icon_${size}.png" "$dir/simple-ipscanner.png"
 done
 
+# Nothing installed under /opt or /usr may be writable by anyone but
+# root, whatever umask the build ran with.
+chmod -R u+rwX,go+rX,go-w "$PKG_ROOT"
+
 cat > "$PKG_ROOT/DEBIAN/control" <<EOF
 Package: simple-ipscanner
 Version: $VERSION

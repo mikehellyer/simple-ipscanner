@@ -79,7 +79,7 @@ def test_no_reply():
 
 
 def test_ping_command_per_platform():
-    assert ping.ping_command("1.2.3.4", 1000, "win32") == ["ping", "-n", "1", "-w", "1000", "1.2.3.4"]
+    assert ping.ping_command("1.2.3.4", 1000, "win32")[1:] == ["-n", "1", "-w", "1000", "1.2.3.4"]
     assert ping.ping_command("1.2.3.4", 500, "darwin")[-3:] == ["-W", "500", "1.2.3.4"]
     assert ping.ping_command("1.2.3.4", 1500, "linux")[-3:] == ["-W", "1.5", "1.2.3.4"]
 
@@ -293,3 +293,37 @@ def test_device_names_follow_the_mac(tmp_path):
     assert book.name_for("10.0.0.8") == "Kettle"
     book.set_name("10.0.0.8", "", "")
     assert book.name_for("10.0.0.8") == ""
+
+
+# --- security
+
+@pytest.mark.parametrize("target", ["-f", "-s65000", "--help", "1.2.3.4 -f", "a;b", "$(reboot)", "", "x" * 300,
+                                    "host_name", "-1.2.3.4"])
+def test_ping_refuses_anything_that_could_be_an_option(target):
+    assert not ping.is_valid_target(target)
+    with pytest.raises(ValueError):
+        ping.ping_command(target, 1000, "linux")
+    assert ping.icmp_ping(target).text == "not a valid address"
+
+
+@pytest.mark.parametrize("target", ["192.168.1.1", "printer", "nas.local", "router.lan.", "my-pi-4"])
+def test_ping_accepts_addresses_and_hostnames(target):
+    assert ping.is_valid_target(target)
+
+
+def test_windows_runs_ping_from_system32_not_the_current_folder(monkeypatch):
+    monkeypatch.setenv("SystemRoot", r"C:\Windows")
+    command = ping.ping_command("1.2.3.4", 1000, "win32")
+    assert command[0].lower().endswith(r"system32\ping.exe") and command[0].lower().startswith("c:")
+
+
+def test_watch_list_ignores_tampered_addresses():
+    w = WatchList()
+    w.load_json([{"ip": "-f"}, {"ip": "10.0.0.1"}])
+    assert w.ips() == ["10.0.0.1"]
+
+
+def test_history_ignores_values_of_the_wrong_type(tmp_path):
+    path = tmp_path / "h.json"
+    path.write_text('{"10.0.0.1": {"alive": true, "hostname": {"x": 1}, "seen": "yesterday", "evil": 1}}')
+    assert ScanHistory(path).get("10.0.0.1") == {"alive": True}
