@@ -110,15 +110,27 @@ class DeviceBook:
                     self.watches = data["watches"]
 
     def name_for(self, ip: str, mac: str = "") -> str:
-        return (mac and self.names.get(mac)) or self.names.get(ip, "")
+        # A name given to this address itself wins over one for its MAC.
+        if ip in self.names:
+            return self.names[ip]
+        return self.names.get(mac, "") if mac else ""
 
-    def set_name(self, ip: str, mac: str, name: str) -> None:
+    def set_name(self, ip: str, mac: str, name: str, mac_shared: bool = False) -> None:
+        """Name a device. Normally the name goes against its MAC, so it
+        follows the device to a new IP. But when other addresses answer
+        with the same MAC (one machine with Wi-Fi and a cable, say — see
+        ResultsModel.shared_with), it goes against this address alone, so
+        naming one doesn't rename the others; an empty name is then kept
+        too, to hide the MAC's name for just this address."""
         name = name.strip()
-        for key in (mac, ip):
-            if key:
-                self.names.pop(key, None)
-        if name:
-            self.names[mac or ip] = name
+        if mac_shared and mac:
+            self.names[ip] = name
+        else:
+            for key in (mac, ip):
+                if key:
+                    self.names.pop(key, None)
+            if name:
+                self.names[mac or ip] = name
         self.save()
 
     def save(self) -> None:

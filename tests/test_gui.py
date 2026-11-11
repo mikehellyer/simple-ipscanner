@@ -102,3 +102,19 @@ def test_hostnames_never_become_tooltips(tmp_path):
     model.set_result(HostResult("10.0.0.1", True, 1.0, method="ping", hostname="<img src=x>"), None, "")
     assert model.data(model.index(0, 2)) == "<img src=x>"  # shown, as plain text in the table
     assert model.data(model.index(0, 2), role=3) is None  # Qt.ToolTipRole
+
+
+def test_addresses_sharing_a_mac_are_pointed_out(tmp_path):
+    model, _ = _model(ScanHistory(tmp_path / "h.json"))
+    mac = "B8:27:EB:44:88:FD"
+    model.set_result(HostResult("10.0.0.1", True, 1.0, method="ping", mac=mac), None, "")
+    assert model.shared_with("10.0.0.1") == []
+    assert model.data(model.index(0, 4)) == mac
+    model.set_result(HostResult("10.0.0.3", True, 1.0, method="ping", mac=mac), None, "")
+    assert model.shared_with("10.0.0.1") == ["10.0.0.3"]
+    assert model.data(model.index(0, 4)) == f"{mac}  (also .3)"
+    assert model.data(model.index(2, 4)) == f"{mac}  (also .1)"
+    assert "two connections" in model.data(model.index(0, 4), role=3)  # Qt.ToolTipRole
+    # one of them goes off: no longer shared
+    model.set_result(HostResult("10.0.0.3", False), None, "")
+    assert model.shared_with("10.0.0.1") == []

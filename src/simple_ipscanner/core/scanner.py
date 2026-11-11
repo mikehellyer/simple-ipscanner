@@ -6,7 +6,7 @@ import queue
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Optional
 
 from simple_ipscanner.core import arp, ping, vendors
@@ -120,18 +120,23 @@ class Scanner(threading.Thread):
         neighbours = arp.read_neighbours()
         own_mac = arp.own_mac()
         late: list[HostResult] = []
-        for ip, result in found.items():
+        for ip, sent in found.items():
+            # A fresh copy each time: the first one is already in the
+            # window's hands, and it has to see what changed.
+            result = replace(sent, ports=list(sent.ports))
             mac, confirmed = neighbours.get(ip, ("", False))
             if result.is_self and own_mac:
                 mac = own_mac
-            if not result.alive and confirmed and not self.cancelled.is_set():
+            is_late = not result.alive and confirmed and not self.cancelled.is_set()
+            if is_late:
                 result.alive, result.method = True, "arp"
-                late.append(result)
             if result.alive and mac:
                 result.mac = mac
                 result.vendor = vendors.vendor_for(mac)
-                if result not in late:
-                    self.results.put(result)
+            if is_late:
+                late.append(result)
+            elif result.mac:
+                self.results.put(result)
         if late:
             with ThreadPoolExecutor(max_workers=max(1, min(16, self.options.threads))) as pool:
                 for result in pool.map(lambda r: (complete_alive(r, self.options), r)[1], late):

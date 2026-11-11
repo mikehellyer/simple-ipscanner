@@ -174,6 +174,17 @@ def test_scanner_reports_every_address(monkeypatch):
     assert not final["10.0.0.1"].alive
 
 
+def test_scanner_never_changes_a_result_it_already_handed_over(monkeypatch):
+    monkeypatch.setattr(ping, "is_alive", lambda ip, t, f: PingReply(True, 1.0, 64, "ping"))
+    monkeypatch.setattr(ping, "resolve_hostname", lambda ip: "")
+    monkeypatch.setattr(arp, "read_neighbours", lambda: {"10.0.0.1": ("B8:27:EB:00:00:01", True)})
+    s = Scanner(["10.0.0.1"], ScanOptions(threads=1))
+    s.start()
+    assert s.finished.wait(10)
+    first, second = s.results.get(), s.results.get()
+    assert first.mac == "" and second.mac == "B8:27:EB:00:00:01"
+
+
 def test_scanner_can_be_cancelled(monkeypatch):
     monkeypatch.setattr(ping, "is_alive", lambda ip, t, f: PingReply(False))
     monkeypatch.setattr(arp, "read_neighbours", lambda: {})
@@ -327,3 +338,23 @@ def test_history_ignores_values_of_the_wrong_type(tmp_path):
     path = tmp_path / "h.json"
     path.write_text('{"10.0.0.1": {"alive": true, "hostname": {"x": 1}, "seen": "yesterday", "evil": 1}}')
     assert ScanHistory(path).get("10.0.0.1") == {"alive": True}
+
+
+def test_a_shared_mac_names_each_address_separately(tmp_path):
+    # A Pi on Wi-Fi and a cable: Linux answers for both addresses with one
+    # card's MAC, so naming one mustn't rename the other.
+    book = DeviceBook(tmp_path / "devices.json")
+    mac = "B8:27:EB:44:88:FD"
+    book.set_name("192.168.1.192", mac, "Pi (cable)", mac_shared=True)
+    book.set_name("192.168.1.238", mac, "Pi (Wi-Fi)", mac_shared=True)
+    book = DeviceBook(tmp_path / "devices.json")
+    assert book.name_for("192.168.1.192", mac) == "Pi (cable)"
+    assert book.name_for("192.168.1.238", mac) == "Pi (Wi-Fi)"
+
+
+def test_a_shared_mac_can_clear_one_address_name(tmp_path):
+    book = DeviceBook(tmp_path / "devices.json")
+    book.set_name("10.0.0.1", "AA:AA:AA:00:00:01", "Pi")  # named before the second connection appeared
+    book.set_name("10.0.0.2", "AA:AA:AA:00:00:01", "", mac_shared=True)
+    assert book.name_for("10.0.0.1", "AA:AA:AA:00:00:01") == "Pi"
+    assert book.name_for("10.0.0.2", "AA:AA:AA:00:00:01") == ""

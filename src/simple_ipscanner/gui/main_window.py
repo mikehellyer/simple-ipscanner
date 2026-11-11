@@ -123,7 +123,7 @@ class MainWindow(QMainWindow):
         header = self._table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)
         header.setStretchLastSection(True)
-        for col, width in enumerate([180, 70, 160, 110, 140, 180, 90, 100, 200]):
+        for col, width in enumerate([180, 70, 160, 110, 210, 180, 90, 100, 200]):
             self._table.setColumnWidth(col, width)
         if self._settings.header_state:
             header.restoreState(QByteArray.fromHex(self._settings.header_state.encode()))
@@ -437,7 +437,7 @@ class MainWindow(QMainWindow):
         mac = row.mac if row else ""
         name, ok = QInputDialog.getText(self, "Name this device", f"Name for {ip}:", text=self._book.name_for(ip, mac))
         if ok:
-            self._book.set_name(ip, mac, name)
+            self._book.set_name(ip, mac, name, mac_shared=bool(self._model.shared_with(ip)))
             self._model.set_name(ip, name.strip())
             if ip in self._watches.items:
                 self._watches.items[ip].name = name.strip()

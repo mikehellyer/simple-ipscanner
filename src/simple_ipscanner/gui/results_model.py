@@ -68,6 +68,10 @@ class ResultsModel(QAbstractTableModel):
         super().__init__(parent)
         self.rows: list[Row] = []
         self._index: dict[str, int] = {}
+        # MAC -> the addresses that are on and answered with it. More than
+        # one usually means a machine with two connections to the same
+        # network (Linux answers for all its addresses on every card).
+        self._by_mac: dict[str, set[str]] = {}
 
     def rowCount(self, parent=QModelIndex()) -> int:
         return 0 if parent.isValid() else len(self.rows)
@@ -88,6 +92,7 @@ class ResultsModel(QAbstractTableModel):
         self.beginResetModel()
         self.rows = [Row(ip, before=history.get(ip)) for ip in addresses]
         self._index = {r.ip: i for i, r in enumerate(self.rows)}
+        self._by_mac = {}
         for r in self.rows:
             r.name = names(r.ip, (r.before or {}).get("mac", ""))
         self.endResetModel()
@@ -104,9 +109,24 @@ class ResultsModel(QAbstractTableModel):
             i = self._index[result.ip] = len(self.rows) - 1
             self.endInsertRows()
         row = self.rows[i]
+        old_mac = row.result.mac if row.alive else ""
         row.result, row.change = result, change
         row.name = name or row.name
-        self._changed(i)
+        new_mac = result.mac if result.alive else ""
+        if old_mac != new_mac:
+            if old_mac:
+                self._by_mac.get(old_mac, set()).discard(result.ip)
+            if new_mac:
+                self._by_mac.setdefault(new_mac, set()).add(result.ip)
+        for ip in self._by_mac.get(old_mac, set()) | self._by_mac.get(new_mac, set()) | {result.ip}:
+            self._changed(self._index[ip])
+
+    def shared_with(self, ip: str) -> list[str]:
+        """Other addresses that answered with this address's MAC."""
+        row = self.row_for(ip)
+        if row is None or not row.alive or not row.result.mac:
+            return []
+        return sorted(self._by_mac.get(row.result.mac, set()) - {ip}, key=ip_sort_key)
 
     def set_name(self, ip: str, name: str) -> None:
         i = self._index.get(ip)
@@ -141,6 +161,12 @@ class ResultsModel(QAbstractTableModel):
         if column == NAME:
             return row.name
         if column == MAC:
+            others = self.shared_with(row.ip)
+            if others:
+                # ".238" for an address in the same /24, as nearly all are
+                net = row.ip.rsplit(".", 1)[0] + "."
+                short = [o[len(net) - 1:] if o.startswith(net) else o for o in others]
+                return f"{row.mac}  (also {', '.join(short)})"
             return row.mac
         if column == MAKER:
             return (r.vendor if r and r.alive else "") or (before.get("vendor", "") if gone else "")
@@ -167,6 +193,10 @@ class ResultsModel(QAbstractTableModel):
                     return f"Didn't answer ping; answered on TCP port {row.result.method[4:]}"
                 if column == PING and row.result and row.result.method == "arp":
                     return "Ignores ping, but answered the network's address lookup (ARP)"
+                if column == MAC and self.shared_with(row.ip):
+                    return ("More than one address answered with this MAC. Usually that's one machine with two "
+                            "connections (Wi-Fi and a cable) on the same network: Linux lets either connection "
+                            "answer for both addresses, so the MAC shown may be the other connection's.")
                 return None  # only the fixed notes above: a tooltip would render a hostname as HTML
             return text
         if role == Qt.DecorationRole and column == IP:
